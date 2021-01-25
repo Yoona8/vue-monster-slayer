@@ -58,11 +58,14 @@
     <section class="game__log log">
       <h2 class="title">Game Log</h2>
       <ul class="log__list">
-        <li class="log__item log__item--monster">
-          Monster hit: <span class="log__value">40</span>
-        </li>
-        <li class="log__item">
-          Player hit: <span class="log__value">100</span>
+        <li
+          class="log__item"
+          v-for="message in logMessages.reverse()"
+          :class="{'log__item--monster': message.isMonster}"
+          :key="message"
+        >
+          {{ message.player }} {{ message.action }}:
+          <span class="log__value">{{ message.value }}</span>
         </li>
       </ul>
     </section>
@@ -74,6 +77,16 @@ const Winner = {
   DRAW: 'draw',
   PLAYER: 'player',
   MONSTER: 'monster'
+};
+const Player = {
+  USER: 'You',
+  MONSTER: 'Monster'
+};
+const Action = {
+  ATTACK: 'hit',
+  SPECIAL_ATTACK: 'used a special attack',
+  SURRENDER: 'surrendered',
+  HEAL: 'healed'
 };
 
 const getRandomInt = (min, max) => {
@@ -95,7 +108,8 @@ export default {
       playerHealMax: 25,
       specialDiff: 7,
       round: 0,
-      winner: null
+      winner: null,
+      logMessages: []
     }
   },
   computed: {
@@ -125,7 +139,6 @@ export default {
         this.winner = Winner.DRAW;
       } else if (value <= 0) {
         this.winner = Winner.MONSTER;
-        this.playerHealth = 0;
       }
     },
     monsterHealth(value) {
@@ -133,7 +146,6 @@ export default {
         this.winner = Winner.DRAW;
       } else if (value <= 0) {
         this.winner = Winner.PLAYER;
-        this.monsterHealth = 0;
       }
     }
   },
@@ -143,6 +155,7 @@ export default {
       this.monsterHealth = this.monsterMaxHealth;
       this.round = 0;
       this.winner = null;
+      this.logMessages = [];
     },
     attackMonster() {
       const attackValue = getRandomInt(this.playerMin, this.playerMax);
@@ -153,14 +166,23 @@ export default {
         this.monsterHealth -= attackValue;
       }
 
+      this.addLogMessage(Player.USER, Action.ATTACK, attackValue);
       this.attackPlayer();
       this.round++;
     },
     attackMonsterSpecial() {
-      this.monsterHealth -= getRandomInt(
+      const attackValue = getRandomInt(
         this.playerMin + this.specialDiff,
         this.monsterMax + this.specialDiff
       );
+
+      if (this.monsterHealth - attackValue < 0) {
+        this.monsterHealth = 0;
+      } else {
+        this.monsterHealth -= attackValue;
+      }
+
+      this.addLogMessage(Player.USER, Action.SPECIAL_ATTACK, attackValue);
       this.attackPlayer();
       this.round++;
     },
@@ -172,6 +194,8 @@ export default {
       } else {
         this.playerHealth -= attackValue;
       }
+
+      this.addLogMessage(Player.MONSTER, Action.ATTACK, attackValue);
     },
     healPlayer() {
       const healValue = getRandomInt(this.playerHealMin, this.playerHealMax);
@@ -182,11 +206,20 @@ export default {
         this.playerHealth += healValue;
       }
 
+      this.addLogMessage(Player.USER, Action.HEAL, healValue);
       this.attackPlayer();
       this.round++;
     },
     surrender() {
       this.winner = Winner.MONSTER;
+    },
+    addLogMessage(player, action, value) {
+      this.logMessages.push({
+        player,
+        action,
+        value,
+        isMonster: player === Player.MONSTER
+      });
     }
   }
 }
@@ -320,9 +353,22 @@ button {
 }
 
 .log {
-  max-width: 500px;
+  max-width: 300px;
   margin-left: auto;
   margin-right: auto;
+  padding: 20px 50px;
+}
+
+.log__item {
+  margin-bottom: 5px;
+}
+
+.log__item--monster {
+  color: var(--c-primary-dark);
+}
+
+.log__value {
+  font-weight: 600;
 }
 
 .game {
