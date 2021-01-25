@@ -8,7 +8,7 @@
       <p class="player__bar">
         <span
           class="player__health"
-          :style="{width: `${playerHealth}%`}"
+          :style="playerBarStyles"
           :aria-label="playerHealth"
         ></span>
       </p>
@@ -18,12 +18,21 @@
       <p class="player__bar">
         <span
           class="player__health"
-          :style="{width: `${monsterHealth}%`}"
+          :style="monsterBarStyles"
           :aria-label="monsterHealth"
         ></span>
       </p>
     </section>
-    <p class="game__controls controls">
+    <section class="game__result result" v-if="winner">
+      <h2 class="title">Game Over!</h2>
+      <p class="result__text">{{ resultMessage }}</p>
+      <button
+        class="button"
+        type="button"
+        @click="restartGame"
+      >Play Again</button>
+    </section>
+    <p class="game__controls controls" v-else>
       <button
         class="button"
         type="button"
@@ -33,9 +42,18 @@
         class="button"
         type="button"
         @click="attackMonsterSpecial"
+        :disabled="!isSpecialAvailable"
       >Special Attack</button>
-      <button class="button" type="button">Heal</button>
-      <button class="button" type="button">Surrender</button>
+      <button
+        class="button"
+        type="button"
+        @click="healPlayer"
+      >Heal</button>
+      <button
+        class="button"
+        type="button"
+        @click="surrender"
+      >Surrender</button>
     </p>
     <section class="game__log log">
       <h2 class="title">Game Log</h2>
@@ -52,6 +70,12 @@
 </template>
 
 <script>
+const Winner = {
+  DRAW: 'draw',
+  PLAYER: 'player',
+  MONSTER: 'monster'
+};
+
 const getRandomInt = (min, max) => {
   return Math.floor(Math.random() * (max - min) + min);
 };
@@ -59,20 +83,78 @@ const getRandomInt = (min, max) => {
 export default {
   data() {
     return {
+      playerMaxHealth: 100,
+      monsterMaxHealth: 100,
       playerHealth: 100,
       monsterHealth: 100,
       monsterMin: 7,
       monsterMax: 20,
       playerMin: 3,
       playerMax: 15,
-      specialDiff: 7
+      playerHealMin: 10,
+      playerHealMax: 25,
+      specialDiff: 7,
+      round: 0,
+      winner: null
     }
   },
-  name: 'App',
+  computed: {
+    monsterBarStyles() {
+      return {width: `${this.monsterHealth}%`};
+    },
+    playerBarStyles() {
+      return {width: `${this.playerHealth}%`};
+    },
+    isSpecialAvailable() {
+      return this.round % 3 === 0;
+    },
+    resultMessage() {
+      switch (this.winner) {
+        case Winner.PLAYER:
+          return 'Congratulations! You won!';
+        case Winner.MONSTER:
+          return 'Monster won. Try to win next time.';
+        default:
+          return 'Draw!';
+      }
+    }
+  },
+  watch: {
+    playerHealth(value) {
+      if (value <= 0 && this.monsterHealth <= 0) {
+        this.winner = Winner.DRAW;
+      } else if (value <= 0) {
+        this.winner = Winner.MONSTER;
+        this.playerHealth = 0;
+      }
+    },
+    monsterHealth(value) {
+      if (value <= 0 && this.playerHealth <= 0) {
+        this.winner = Winner.DRAW;
+      } else if (value <= 0) {
+        this.winner = Winner.PLAYER;
+        this.monsterHealth = 0;
+      }
+    }
+  },
   methods: {
+    restartGame() {
+      this.playerHealth = this.playerMaxHealth;
+      this.monsterHealth = this.monsterMaxHealth;
+      this.round = 0;
+      this.winner = null;
+    },
     attackMonster() {
-      this.monsterHealth -= getRandomInt(this.playerMin, this.playerMax);
+      const attackValue = getRandomInt(this.playerMin, this.playerMax);
+
+      if (this.monsterHealth - attackValue < 0) {
+        this.monsterHealth = 0;
+      } else {
+        this.monsterHealth -= attackValue;
+      }
+
       this.attackPlayer();
+      this.round++;
     },
     attackMonsterSpecial() {
       this.monsterHealth -= getRandomInt(
@@ -80,9 +162,31 @@ export default {
         this.monsterMax + this.specialDiff
       );
       this.attackPlayer();
+      this.round++;
     },
     attackPlayer() {
-      this.playerHealth -= getRandomInt(this.monsterMin, this.monsterMax);
+      const attackValue = getRandomInt(this.monsterMin, this.monsterMax);
+
+      if (this.playerHealth - attackValue < 0) {
+        this.playerHealth = 0;
+      } else {
+        this.playerHealth -= attackValue;
+      }
+    },
+    healPlayer() {
+      const healValue = getRandomInt(this.playerHealMin, this.playerHealMax);
+
+      if (this.playerHealth + healValue > this.playerMaxHealth) {
+        this.playerHealth = this.playerMaxHealth;
+      } else {
+        this.playerHealth += healValue;
+      }
+
+      this.attackPlayer();
+      this.round++;
+    },
+    surrender() {
+      this.winner = Winner.MONSTER;
     }
   }
 }
@@ -159,6 +263,11 @@ button {
   background-color: var(--c-primary-neutral);
 }
 
+.button:disabled {
+  background-color: var(--c-neutral);
+  border-color: var(--c-neutral);
+}
+
 .player {
   max-width: 500px;
   margin-left: auto;
@@ -187,6 +296,18 @@ button {
   background-color: var(--c-primary);
   border-radius: 20px;
   transition: width var(--basic-transition);
+}
+
+.result {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 40px;
+  text-align: center;
+}
+
+.result__text {
+  font-size: 20px;
+  text-align: center;
 }
 
 .controls {
